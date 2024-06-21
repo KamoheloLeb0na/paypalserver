@@ -2,6 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const paypal = require('@paypal/checkout-server-sdk');
+const { v4: uuidv4 } = require('uuid');
 
 // PayPal configuration
 const environment = new paypal.core.SandboxEnvironment('ASr-GgV6hNF9M_QqkXswue7HNctkVyHZscapjYTQO59AaTceomyBN8BndAmJakKRa3TozzhUrViQs4e6', 'EC3qcpsmN1ldM2XkC_1K-9qzWJa8KwekwjQ9DoF4tKnURq3QgbK36U4Feyuotg8bvxAc-M2vtHMbJu3T');
@@ -32,6 +33,7 @@ app.post("/checkout", async (req, res) => {
   try {
     // Create order
     const request = new paypal.orders.OrdersCreateRequest();
+    request.headers["PayPal-Request-Id"] = uuidv4(); // Add a unique PayPal-Request-Id
     request.requestBody({
       intent: 'CAPTURE',
       purchase_units: [{
