@@ -45,7 +45,7 @@ app.post("/checkout", async (req, res) => {
       payment_source: {
         card: {
           number: cardNumber,
-          expiry: expiryDate,
+          expiry: expiryDate.replace(/-/g, ""), // Remove any dashes from expiryDate
           name: cardHolderName,
           security_code: cvvCode
         }
@@ -56,7 +56,7 @@ app.post("/checkout", async (req, res) => {
     res.send({ success: true, orderID: order.result.id });
   } catch (error) {
     console.error("Error creating PayPal order:", error);
-    res.status(500).send(error);
+    res.status(500).send({ error: error.message });
   }
 });
 
@@ -80,7 +80,7 @@ app.get("/subscription_status/:subscriptionId", async (req, res) => {
     }
   } catch (error) {
     console.error("Error fetching subscription status:", error);
-    res.status(500).send(error);
+    res.status(500).send({ error: error.message });
   }
 });
 
