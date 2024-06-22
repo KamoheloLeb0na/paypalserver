@@ -2,7 +2,6 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const paypal = require('@paypal/checkout-server-sdk');
-const { v4: uuidv4 } = require('uuid');
 
 // PayPal configuration
 const environment = new paypal.core.SandboxEnvironment('ASr-GgV6hNF9M_QqkXswue7HNctkVyHZscapjYTQO59AaTceomyBN8BndAmJakKRa3TozzhUrViQs4e6', 'EC3qcpsmN1ldM2XkC_1K-9qzWJa8KwekwjQ9DoF4tKnURq3QgbK36U4Feyuotg8bvxAc-M2vtHMbJu3T');
@@ -23,40 +22,32 @@ app.get("/client_token", (req, res) => {
 });
 
 app.post("/checkout", async (req, res) => {
-  const { cardNumber, expiryDate, cardHolderName, cvvCode } = req.body;
+  const { payment_method_nonce } = req.body;
+  const planId = "P-6PR072875L842443BMZ26M6Y"; // Your PayPal plan ID
 
-  if (!cardNumber || !expiryDate || !cardHolderName || !cvvCode) {
-    console.error("All card details are required");
-    return res.status(400).send({ error: "All card details are required" });
+  if (!payment_method_nonce) {
+    console.error("Payment method nonce is required");
+    return res.status(400).send({ error: "Payment method nonce is required" });
   }
 
   try {
     // Create order
     const request = new paypal.orders.OrdersCreateRequest();
-    request.headers["PayPal-Request-Id"] = uuidv4(); // Add a unique PayPal-Request-Id
     request.requestBody({
       intent: 'CAPTURE',
       purchase_units: [{
         amount: {
           currency_code: 'USD',
-          value: '15.00'
+          value: '1.00'
         }
-      }],
-      payment_source: {
-        card: {
-          number: cardNumber,
-          expiry: expiryDate.replace(/-/g, ""), // Remove any dashes from expiryDate
-          name: cardHolderName,
-          security_code: cvvCode
-        }
-      }
+      }]
     });
 
     const order = await client.execute(request);
     res.send({ success: true, orderID: order.result.id });
   } catch (error) {
     console.error("Error creating PayPal order:", error);
-    res.status(500).send({ error: error.message });
+    res.status(500).send(error);
   }
 });
 
@@ -80,7 +71,7 @@ app.get("/subscription_status/:subscriptionId", async (req, res) => {
     }
   } catch (error) {
     console.error("Error fetching subscription status:", error);
-    res.status(500).send({ error: error.message });
+    res.status(500).send(error);
   }
 });
 
