@@ -4,16 +4,18 @@ const cors = require("cors");
 const paypal = require('@paypal/checkout-server-sdk');
 const admin = require('firebase-admin');
 
-// Initialize Firebase Admin SDK
-const serviceAccount = require('./forz-official.json'); // Firebase service account key
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// Initialize Firebase Admin SDK (ensure it only initializes once)
+if (!admin.apps.length) {
+  const serviceAccount = require('./path_to_your_service_account.json');
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 const db = admin.firestore();
 
 // PayPal configuration
-const environment = new paypal.core.SandboxEnvironment('ASr-GgV6hNF9M_QqkXswue7HNctkVyHZscapjYTQO59AaTceomyBN8BndAmJakKRa3TozzhUrViQs4e6', 'EC3qcpsmN1ldM2XkC_1K-9qzWJa8KwekwjQ9DoF4tKnURq3QgbK36U4Feyuotg8bvxAc-M2vtHMbJu3T');
+const environment = new paypal.core.SandboxEnvironment('YOUR_PAYPAL_CLIENT_ID', 'YOUR_PAYPAL_SECRET_KEY');
 const client = new paypal.core.PayPalHttpClient(environment);
 
 const app = express();
@@ -26,15 +28,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Route to show "Arbitrex server"
-app.get("/", (req, res) => {
-  res.send("Flutter app Arbitrex server");
-});
-
-// Endpoint for processing payment
+// Endpoint for payment validation
 app.post("/checkout", async (req, res) => {
   const { payment_method_nonce, start_date, end_date, tier, amount, location } = req.body;
-  
+
   if (!payment_method_nonce) {
     console.error("Payment method nonce is required");
     return res.status(400).send({ error: "Payment method nonce is required" });
@@ -48,20 +45,20 @@ app.post("/checkout", async (req, res) => {
       purchase_units: [{
         amount: {
           currency_code: 'USD',
-          value: amount.toString()
-        }
-      }]
+          value: amount.toString(),
+        },
+      }],
     });
 
     const order = await client.execute(request);
     
-    // Capture the payment after order creation
+    // Capture payment after creating order
     const captureRequest = new paypal.orders.OrdersCaptureRequest(order.result.id);
     const capture = await client.execute(captureRequest);
 
     if (capture.status === "COMPLETED") {
       // Store gig data in Firestore
-      const email = capture.result.payer.email_address; // Retrieve email from PayPal response
+      const email = capture.result.payer.email_address;
 
       const gigData = {
         email: email,
@@ -75,16 +72,22 @@ app.post("/checkout", async (req, res) => {
         location: location,
       };
 
-      // Save the gig data to Firestore
+      // Save gig data to Firestore
       await db.collection('gigs').add(gigData);
+
       res.send({ success: true, orderID: order.result.id, message: 'Payment processed and gig saved.' });
     } else {
       res.status(400).send({ error: 'Payment capture failed.' });
     }
   } catch (error) {
-    console.error("Error processing PayPal order:", error);
-    res.status(500).send(error);
+    console.error("Error during PayPal order processing:", error);
+    res.status(500).send({ error: 'Internal server error', message: error.message });
   }
+});
+
+// Route to show "Arbitrex server"
+app.get("/", (req, res) => {
+  res.send("Flutter app Arbitrex server is running");
 });
 
 // Listen on the appropriate port
